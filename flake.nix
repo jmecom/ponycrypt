@@ -25,6 +25,60 @@
           default = pkgs.ponyc;
           ponyc = pkgs.ponyc;
           corral = pkgs.pony-corral;
+          ponycrypt = pkgs.stdenv.mkDerivation {
+            pname = "ponycrypt";
+            version = "0.1.0";
+            src = ./.;
+
+            nativeBuildInputs = [ pkgs.ponyc ];
+
+            buildPhase = ''
+              runHook preBuild
+              ponyc ponycrypt -o build
+              runHook postBuild
+            '';
+
+            installPhase = ''
+              runHook preInstall
+              install -Dm755 build/ponycrypt $out/bin/ponycrypt
+              runHook postInstall
+            '';
+          };
+        });
+
+      checks = forAllSystems (system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        {
+          ponycrypt-tests = pkgs.stdenv.mkDerivation {
+            pname = "ponycrypt-tests";
+            version = "0.1.0";
+            src = ./.;
+
+            nativeBuildInputs = [ pkgs.ponyc ];
+
+            buildPhase = ''
+              runHook preBuild
+              ponyc ponycrypt_test -p . -o build
+              runHook postBuild
+            '';
+
+            doCheck = true;
+
+            checkPhase = ''
+              runHook preCheck
+              ./build/ponycrypt_test
+              runHook postCheck
+            '';
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p $out
+              touch $out/passed
+              runHook postInstall
+            '';
+          };
         });
 
       devShells = forAllSystems (system:
