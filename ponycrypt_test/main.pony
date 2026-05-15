@@ -12,6 +12,8 @@ actor Main is TestList
   fun tag tests(test: PonyTest) =>
     test(_TestSha256KnownVectors)
     test(_TestHexDecode)
+    test(_TestAesKnownVectors)
+    test(_TestWycheproofAesCbcPkcs5)
     test(_TestHmacSha256Rfc4231)
     test(_TestWycheproofHmacSha256)
 
@@ -36,6 +38,96 @@ class iso _TestHexDecode is UnitTest
     h.assert_eq[String]("deadbeef", pc.Hex.encode(pc.Hex.decode("deadbeef")?))
     h.assert_error({()? => pc.Hex.decode("abc")? })
     h.assert_error({()? => pc.Hex.decode("zz")? })
+
+class iso _TestAesKnownVectors is UnitTest
+  fun name(): String => "aes/known-vectors"
+
+  fun apply(h: TestHelper) ? =>
+    _assert_aes(
+      h,
+      "2b7e151628aed2a6abf7158809cf4f3c",
+      "6bc1bee22e409f96e93d7e117393172a",
+      "3ad77bb40d7a3660a89ecaf32466ef97")?
+    _assert_aes(
+      h,
+      "8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b",
+      "6bc1bee22e409f96e93d7e117393172a",
+      "bd334f1d6e45f25ff712a214571fa5cc")?
+    _assert_aes(
+      h,
+      "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
+      "6bc1bee22e409f96e93d7e117393172a",
+      "f3eed1bdb5d2a03c064b5a7e3db181f8")?
+
+    h.assert_error({()? =>
+      pc.Aes.encrypt_block(pc.Hex.decode("00112233445566778899aabbccddeeff")?,
+        "short")?
+    })
+    h.assert_error({()? =>
+      pc.Aes.encrypt_block("short key",
+        pc.Hex.decode("00112233445566778899aabbccddeeff")?)?
+    })
+
+  fun _assert_aes(
+    h: TestHelper,
+    key_hex: String,
+    pt_hex: String,
+    ct_hex: String)
+    ?
+  =>
+    let key_iso = pc.Hex.decode(key_hex)?
+    let key: Array[U8] val = consume key_iso
+    let pt_iso = pc.Hex.decode(pt_hex)?
+    let pt: Array[U8] val = consume pt_iso
+    let ct_iso = pc.Hex.decode(ct_hex)?
+    let ct: Array[U8] val = consume ct_iso
+
+    h.assert_eq[String](ct_hex, pc.Hex.encode(pc.Aes.encrypt_block(key, pt)?))
+    h.assert_eq[String](pt_hex, pc.Hex.encode(pc.Aes.decrypt_block(key, ct)?))
+
+class iso _TestWycheproofAesCbcPkcs5 is UnitTest
+  fun name(): String => "wycheproof/aes-cbc-pkcs5"
+
+  fun apply(h: TestHelper) ? =>
+    var count: USize = 0
+    var valid_count: USize = 0
+    var invalid_count: USize = 0
+
+    for tc in WycheproofAesCbcPkcs5Vectors().values() do
+      let key_iso = pc.Hex.decode(tc.key)?
+      let key: Array[U8] val = consume key_iso
+      let iv_iso = pc.Hex.decode(tc.iv)?
+      let iv: Array[U8] val = consume iv_iso
+      let msg_iso = pc.Hex.decode(tc.msg)?
+      let msg: Array[U8] val = consume msg_iso
+      let ct_iso = pc.Hex.decode(tc.ct)?
+      let ct: Array[U8] val = consume ct_iso
+      let label_iso = "tcId=" + tc.id.string() + " " + tc.comment
+      let label: String val = consume label_iso
+
+      if tc.valid then
+        h.assert_eq[String](
+          tc.ct,
+          pc.Hex.encode(AesCbcPkcs5ForTest.encrypt(key, iv, msg)?),
+          label)
+        h.assert_eq[String](
+          tc.msg,
+          pc.Hex.encode(AesCbcPkcs5ForTest.decrypt(key, iv, ct)?),
+          label)
+        valid_count = valid_count + 1
+      else
+        h.assert_error({()? =>
+          AesCbcPkcs5ForTest.decrypt(key, iv, ct)?
+        }, label)
+        invalid_count = invalid_count + 1
+      end
+
+      count = count + 1
+    end
+
+    h.assert_eq[USize](216, count)
+    h.assert_eq[USize](72, valid_count)
+    h.assert_eq[USize](144, invalid_count)
 
 class iso _TestHmacSha256Rfc4231 is UnitTest
   fun name(): String => "hmac-sha256/rfc4231"
