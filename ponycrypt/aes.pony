@@ -261,7 +261,7 @@ primitive Aes
     var out: U8 = 0
 
     for i in Range[USize](0, 8) do
-      let mask = (b and 1) * 0xff
+      let mask = _bit_mask(b)
       out = out xor (a and mask)
       a = _xtime(a)
       b = b >> 1
@@ -276,7 +276,14 @@ primitive Aes
     _xtime(x) xor x
 
   fun _xtime(x: U8): U8 =>
-    (x << 1) xor (((x >> 7) and 1) * 0x1b)
+    (x << 1) xor (_bit_mask(x >> 7) and 0x1b)
+
+  fun _bit_mask(bit: U8): U8 =>
+    var mask = bit and 1
+    mask = mask or (mask << 1)
+    mask = mask or (mask << 2)
+    mask = mask or (mask << 4)
+    mask
 
   fun _rotl8(x: U8, n: U8): U8 =>
     (x << n) or (x >> (8 - n))
