@@ -1,6 +1,4 @@
-use "collections"
-
-primitive Sha256
+primitive Sha256 is HashAlgorithm
   """
   Pure Pony SHA-256.
 
@@ -8,10 +6,17 @@ primitive Sha256
   message schedule expansion, and the 64-round compression function are all
   implemented here without calling an external crypto library.
   """
+  new create() =>
+    None
+
   fun digest(data: ReadSeq[U8]): Array[U8] val =>
     let d = Sha256Digest
     d.update(data)
     d.final()
+
+  fun block_size(): USize => 64
+
+  fun output_size(): USize => 32
 
   fun hex(data: ReadSeq[U8]): String iso^ =>
     Hex.encode(digest(data))
@@ -161,142 +166,6 @@ class Sha256Digest
     _h5 = _h5 + f
     _h6 = _h6 + g
     _h7 = _h7 + h
-
-primitive Hex
-  fun encode(data: ReadSeq[U8]): String iso^ =>
-    let out = recover String(data.size() * 2) end
-    let digits = "0123456789abcdef"
-
-    try
-      for byte in data.values() do
-        out.push(digits((byte >> 4).usize())?)
-        out.push(digits((byte and 0x0f).usize())?)
-      end
-    end
-
-    out
-
-  fun decode(data: ReadSeq[U8]): Array[U8] iso^ ? =>
-    if (data.size() % 2) != 0 then
-      error
-    end
-
-    let out = recover Array[U8](data.size() / 2) end
-
-    var i: USize = 0
-    while i < data.size() do
-      let hi = _nibble(data(i)?)?
-      let lo = _nibble(data(i + 1)?)?
-      out.push((hi << 4) or lo)
-      i = i + 2
-    end
-
-    out
-
-  fun _nibble(c: U8): U8 ? =>
-    if (c >= '0') and (c <= '9') then
-      c - '0'
-    elseif (c >= 'a') and (c <= 'f') then
-      (c - 'a') + 10
-    elseif (c >= 'A') and (c <= 'F') then
-      (c - 'A') + 10
-    else
-      error
-    end
-
-primitive HmacSha256
-  fun digest(key: ReadSeq[U8], msg: ReadSeq[U8]): Array[U8] val =>
-    let key_block = _key_block(key)
-    let inner_pad = Array[U8](64)
-    let outer_pad = Array[U8](64)
-
-    try
-      for i in Range[USize](0, 64) do
-        let b = key_block(i)?
-        inner_pad.push(b xor 0x36)
-        outer_pad.push(b xor 0x5c)
-      end
-    end
-
-    let inner = Sha256Digest
-    inner.update(inner_pad)
-    inner.update(msg)
-    let inner_hash = inner.final()
-
-    let outer = Sha256Digest
-    outer.update(outer_pad)
-    outer.update(inner_hash)
-    outer.final()
-
-  fun mac(key: ReadSeq[U8], msg: ReadSeq[U8], tag_size_bits: USize = 256)
-    : Array[U8] val ?
-  =>
-    if (tag_size_bits % 8) != 0 then
-      error
-    end
-
-    let tag_size = tag_size_bits / 8
-    let full = digest(key, msg)
-
-    if tag_size > full.size() then
-      error
-    end
-
-    recover val
-      let out = Array[U8](tag_size)
-      var i: USize = 0
-      while i < tag_size do
-        out.push(full(i)?)
-        i = i + 1
-      end
-      out
-    end
-
-  fun verify(key: ReadSeq[U8], msg: ReadSeq[U8], expected: ReadSeq[U8])
-    : Bool
-  =>
-    try
-      ConstantTime.eq(mac(key, msg, expected.size() * 8)?, expected)
-    else
-      false
-    end
-
-  fun _key_block(key: ReadSeq[U8]): Array[U8] ref =>
-    let out = Array[U8](64)
-
-    if key.size() > 64 then
-      _copy(out, Sha256.digest(key))
-    else
-      _copy(out, key)
-    end
-
-    while out.size() < 64 do
-      out.push(0)
-    end
-
-    out
-
-  fun _copy(out: Array[U8] ref, data: ReadSeq[U8]) =>
-    for b in data.values() do
-      out.push(b)
-    end
-
-primitive ConstantTime
-  fun eq(a: ReadSeq[U8], b: ReadSeq[U8]): Bool =>
-    var diff: USize = if a.size() == b.size() then 0 else 1 end
-    let max = a.size().max(b.size())
-
-    try
-      for i in Range[USize](0, max) do
-        let av = if i < a.size() then a(i)? else 0 end
-        let bv = if i < b.size() then b(i)? else 0 end
-        diff = diff or ((av xor bv).usize())
-      end
-    else
-      return false
-    end
-
-    diff == 0
 
 primitive _Sha256Bytes
   fun push_u32(out: Array[U8] ref, word: U32) =>

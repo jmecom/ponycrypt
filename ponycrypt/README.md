@@ -1,9 +1,17 @@
 # ponycrypt
 
-Small Pony SHA-256 experiment.
+Small Pony SHA-256 and HMAC experiment.
 
-This directory contains a from-scratch SHA-256 implementation in Pony. It does
-not import `ssl/crypto`, OpenSSL, libsodium, or another crypto package.
+This directory contains from-scratch SHA-256 and generic HMAC implementations in
+Pony. It does not import `ssl/crypto`, OpenSSL, libsodium, or another crypto
+package.
+
+Library shape:
+
+```pony
+let digest = Sha256.digest("abc")
+let tag = Hmac[Sha256].digest("key", "message")
+```
 
 Build:
 

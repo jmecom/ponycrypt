@@ -40,19 +40,29 @@ class iso _TestHexDecode is UnitTest
 class iso _TestHmacSha256Rfc4231 is UnitTest
   fun name(): String => "hmac-sha256/rfc4231"
 
-  fun apply(h: TestHelper) =>
+  fun apply(h: TestHelper) ? =>
     let key1 = recover val
       let out = Array[U8](20)
       for i in Range[USize](0, 20) do out.push(0x0b) end
       out
     end
+    let expected1 =
+      "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
     h.assert_eq[String](
-      "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7",
+      expected1,
+      pc.Hex.encode(pc.Hmac[pc.Sha256].digest(key1, "Hi There")))
+    h.assert_eq[String](
+      expected1,
       pc.Hex.encode(pc.HmacSha256.digest(key1, "Hi There")))
 
+    let expected2 =
+      "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
     h.assert_eq[String](
-      "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843",
-      pc.Hex.encode(pc.HmacSha256.digest("Jefe", "what do ya want for nothing?")))
+      expected2,
+      pc.Hex.encode(pc.Hmac[pc.Sha256].digest("Jefe", "what do ya want for nothing?")))
+    h.assert_eq[String](
+      expected2,
+      pc.Hex.encode(pc.Hmac[pc.Sha256].mac("Jefe", "what do ya want for nothing?")?))
 
     let key3 = recover val
       let out = Array[U8](20)
@@ -66,7 +76,7 @@ class iso _TestHmacSha256Rfc4231 is UnitTest
     end
     h.assert_eq[String](
       "773ea91e36800e46854db8ebd09181a72959098b3ef8c122d9635514ced565fe",
-      pc.Hex.encode(pc.HmacSha256.digest(key3, data3)))
+      pc.Hex.encode(pc.Hmac[pc.Sha256].digest(key3, data3)))
 
 class iso _TestWycheproofHmacSha256 is UnitTest
   fun name(): String => "wycheproof/hmac-sha256"
@@ -81,10 +91,10 @@ class iso _TestWycheproofHmacSha256 is UnitTest
       let expected_iso = pc.Hex.decode(tc.mac)?
       let expected: Array[U8] val = consume expected_iso
 
-      let actual = pc.HmacSha256.mac(key, msg, tc.tag_size)?
+      let actual = pc.Hmac[pc.Sha256].mac(key, msg, tc.tag_size)?
       let actual_hex_iso = pc.Hex.encode(actual)
       let actual_hex: String val = consume actual_hex_iso
-      let verify = pc.HmacSha256.verify(key, msg, expected)
+      let verify = pc.Hmac[pc.Sha256].verify(key, msg, expected)
       let label_iso = "tcId=" + tc.id.string() + " " + tc.comment
       let label: String val = consume label_iso
 
