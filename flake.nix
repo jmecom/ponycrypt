@@ -90,6 +90,10 @@
             packages = with pkgs; [
               ponyc
               pony-corral
+              openssl
+              (python3.withPackages (python-pkgs: [
+                python-pkgs.cryptography
+              ]))
             ];
 
             shellHook = ''

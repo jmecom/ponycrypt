@@ -14,6 +14,15 @@ actor Main is TestList
     test(_TestHexDecode)
     test(_TestAesKnownVectors)
     test(_TestWycheproofAesCbcPkcs5)
+    test(_TestSecp256k1U256)
+    test(_TestSecp256k1ModArithmetic)
+    test(_TestSecp256k1ScalarArithmetic)
+    test(_TestSecp256k1PointArithmetic)
+    test(_TestSecp256k1PropertyCorpus)
+    test(_TestEcdsaSecp256k1KnownVector)
+    test(_TestOpenSslEcdsaSecp256k1Vectors)
+    test(_TestWycheproofEcdsaSecp256k1P1363)
+    test(_TestEcdsaSecp256k1NegativeCorpus)
     test(_TestHmacSha256Rfc4231)
     test(_TestWycheproofHmacSha256)
 
@@ -128,6 +137,60 @@ class iso _TestWycheproofAesCbcPkcs5 is UnitTest
     h.assert_eq[USize](216, count)
     h.assert_eq[USize](72, valid_count)
     h.assert_eq[USize](144, invalid_count)
+
+class iso _TestEcdsaSecp256k1KnownVector is UnitTest
+  fun name(): String => "ecdsa-secp256k1/known-vector"
+
+  fun apply(h: TestHelper) ? =>
+    let private_key = _hex(
+      "ebb2c082fd7727890a28ac82f6bdf97bad8de9f5d7c9028692de1a255cad3e0f")?
+    let nonce = _hex(
+      "49a0d7b786ec9cde0d0721d72804befd06571c974b191efb42ecf322ba9ddd9a")?
+    let digest = _hex(
+      "4b688df40bcedbe641ddb16ff0a1842d9c67ea1c3bf63f3e0471baa664531d1a")?
+    let public_key_hex_iso =
+      "04779dd197a5df977ed2cf6cb31d82d43328b790dc6b3b7d4437a427bd5847dfcd" +
+      "e94b724a555b6d017bb7607c3e3281daf5b1699d6ef4124975c9237b917d426f"
+    let public_key_hex: String val = consume public_key_hex_iso
+    let signature_hex_iso =
+      "241097efbf8b63bf145c8961dbdf10c310efbb3b2676bbc0f8b08505c9e2f795" +
+      "021006b7838609339e8b415a7f9acb1b661828131aef1ecbc7955dfb01f3ca0e"
+    let signature_hex: String val = consume signature_hex_iso
+
+    let public_key = pc.EcdsaSecp256k1.public_key(private_key)?
+    h.assert_eq[String](
+      public_key_hex,
+      pc.Hex.encode(public_key.to_uncompressed()))
+
+    let parsed_public_key = pc.EcdsaSecp256k1.public_key_from_uncompressed(
+      _hex(public_key_hex)?)?
+    let signature = pc.EcdsaSecp256k1.sign_digest_with_k(
+      private_key,
+      digest,
+      nonce)?
+    h.assert_eq[String](signature_hex, pc.Hex.encode(signature.to_bytes()))
+    h.assert_true(pc.EcdsaSecp256k1.verify_digest(
+      parsed_public_key,
+      digest,
+      signature))
+
+    let deterministic = pc.EcdsaSecp256k1.sign_digest(private_key, digest)?
+    h.assert_true(pc.EcdsaSecp256k1.verify_digest(
+      parsed_public_key,
+      digest,
+      deterministic))
+
+    let bad_signature = pc.EcdsaSecp256k1.signature_from_bytes(_hex(
+      "241097efbf8b63bf145c8961dbdf10c310efbb3b2676bbc0f8b08505c9e2f795" +
+      "021006b7838609339e8b415a7f9acb1b661828131aef1ecbc7955dfb01f3ca0f")?)?
+    h.assert_false(pc.EcdsaSecp256k1.verify_digest(
+      parsed_public_key,
+      digest,
+      bad_signature))
+
+  fun _hex(data: String box): Array[U8] val ? =>
+    let iso_data = pc.Hex.decode(data)?
+    consume iso_data
 
 class iso _TestHmacSha256Rfc4231 is UnitTest
   fun name(): String => "hmac-sha256/rfc4231"
